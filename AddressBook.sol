@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract AddressBook is Ownable(msg.sender) {
+contract AddressBook is Ownable {
     string public salt = "vrt"; 
     struct Contact {
         uint id;
@@ -13,40 +13,33 @@ contract AddressBook is Ownable(msg.sender) {
     }
 
     Contact[] private contacts;
-    mapping(uint => uint) private idToIndex;
-    uint private nextId = 1;
+    mapping(uint => Contact) private idToContact;
 
     event ContactAdded(uint indexed id, string firstName, string lastName, uint[] phoneNumbers);
     event ContactDeleted(uint indexed id);
 
     error ContactNotFound(uint id);
 
+    constructor() Ownable() {}
+
     function addContact(string calldata firstName, string calldata lastName, uint[] calldata phoneNumbers) external onlyOwner {
-        contacts.push(Contact(nextId, firstName, lastName, phoneNumbers));
-        idToIndex[nextId] = contacts.length;
-        emit ContactAdded(nextId, firstName, lastName, phoneNumbers);
-        nextId++;
+        uint id = contacts.length + 1;
+        Contact memory newContact = Contact(id, firstName, lastName, phoneNumbers);
+        contacts.push(newContact);
+        idToContact[id] = newContact;
+        emit ContactAdded(id, firstName, lastName, phoneNumbers);
     }
 
     function deleteContact(uint id) external onlyOwner {
-        uint index = idToIndex[id];
-        if (index == 0 || index > contacts.length || contacts[index - 1].id != id) revert ContactNotFound(id);
-
+        require(id <= contacts.length, "Contact not found");
+        delete idToContact[id];
         emit ContactDeleted(id);
-
-        uint lastIndex = contacts.length - 1;
-        if (index != contacts.length) {
-            contacts[index - 1] = contacts[lastIndex];
-            idToIndex[contacts[index - 1].id] = index;
-        }
-        contacts.pop();
-        delete idToIndex[id];
     }
 
     function getContact(uint id) external view returns (Contact memory) {
-        uint index = idToIndex[id];
-        if (index == 0 || index > contacts.length || contacts[index - 1].id != id) revert ContactNotFound(id);
-        return contacts[index - 1];
+        Contact memory contact = idToContact[id];
+        if (contact.id == 0) revert ContactNotFound(id);
+        return contact;
     }
 
     function getAllContacts() external view returns (Contact[] memory) {
